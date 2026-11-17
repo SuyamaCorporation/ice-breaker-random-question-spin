@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>アイスブレイク質問ランダムスピン</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes spin-question {
+      0%   { opacity: 0.3; transform: translateY(-8px); }
+      50%  { opacity: 1;   transform: translateY(0); }
+      100% { opacity: 0.3; transform: translateY(8px); }
+    }
+    .spinning { animation: spin-question 0.12s linear infinite; }
+    .landing  { animation: none; transition: all 0.3s ease-out; }
+    .category-btn.active { ring: 2px; }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-50 to-purple-50 min-h-screen font-sans">
+  <div class="max-w-2xl mx-auto px-4 py-8">
+    <header class="text-center mb-8">
+      <h1 class="text-3xl font-bold text-indigo-700 mb-2">🎯 アイスブレイク質問スピナー</h1>
+      <p class="text-gray-500 text-sm">パーティーや会議のアイスブレイクに！</p>
+    </header>
+
+    <!-- Category Filter -->
+    <section aria-label="カテゴリフィルター" class="mb-6">
+      <p class="text-sm font-semibold text-gray-600 mb-2">カテゴリ選択（複数可）</p>
+      <div class="flex flex-wrap gap-2" id="categoryFilters" role="group" aria-label="カテゴリ選択ボタン">
+        <button data-cat="仕事" role="checkbox" aria-checked="true"
+          class="category-btn active px-4 py-2 rounded-full text-sm font-medium border-2 border-indigo-400 bg-indigo-100 text-indigo-700 transition"
+          onclick="toggleCategory(this)">💼 仕事</button>
+        <button data-cat="趣味" role="checkbox" aria-checked="true"
+          class="category-btn active px-4 py-2 rounded-full text-sm font-medium border-2 border-green-400 bg-green-100 text-green-700 transition"
+          onclick="toggleCategory(this)">🎮 趣味</button>
+        <button data-cat="旅行" role="checkbox" aria-checked="true"
+          class="category-btn active px-4 py-2 rounded-full text-sm font-medium border-2 border-orange-400 bg-orange-100 text-orange-700 transition"
+          onclick="toggleCategory(this)">✈️ 旅行</button>
+        <button data-cat="夢" role="checkbox" aria-checked="true"
+          class="category-btn active px-4 py-2 rounded-full text-sm font-medium border-2 border-pink-400 bg-pink-100 text-pink-700 transition"
+          onclick="toggleCategory(this)">🌟 夢</button>
+      </div>
+    </section>
+
+    <!-- Question Display -->
+    <section aria-label="質問表示エリア" class="bg-white rounded-2xl shadow-lg p-8 mb-6 text-center min-h-[180px] flex flex-col items-center justify-center relative">
+      <div id="categoryBadge" class="absolute top-4 right-4 text-xs px-3 py-1 rounded-full bg-indigo-100 text-indigo-600 font-medium"></div>
+      <p id="questionDisplay" class="text-xl font-bold text-gray-700 leading-relaxed mb-4">
+        ボタンを押して質問をスピン！
+      </p>
+      <button id="favoriteBtn" aria-label="お気に入りに追加" onclick="toggleFavorite()"
+        class="text-2xl transition-transform hover:scale-125 focus:outline-none focus:ring-2 focus:ring-pink-400 rounded-full p-1" style="display:none;">
+        🤍
+      </button>
+    </section>
+
+    <!-- Spin Button -->
+    <div class="flex justify-center mb-8">
+      <button onclick="spinQuestion()" id="spinBtn"
+        aria-label="質問をスピンする"
+        class="px-10 py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white text-xl font-bold rounded-full shadow-lg transition-all focus:outline-none focus:ring-4 focus:ring-indigo-300">
+        🎲 スピン！
+      </button>
+    </div>
+
+    <!-- Recent History -->
+    <section aria-label="最近の質問履歴" class="mb-6">
+      <h2 class="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-2">
+        <span>🕐 最近の質問（直近10件は出にくくなります）</span>
+        <button onclick="clearHistory()" class="ml-auto text-xs text-gray-400 hover:text-red-400 underline" aria-label="履歴をクリア">クリア</button>
+      </h2>
+      <ul id="historyList" class="space-y-1 text-sm text-gray-500 max-h-40 overflow-y-auto"></ul>
+    </section>
+
+    <!-- Favorites -->
+    <section aria-label="お気に入り質問リスト">
+      <h2 class="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-2">
+        <span>❤️ お気に入り（最大30件）</span>
+        <button onclick="clearFavorites()" class="ml-auto text-xs text-gray-400 hover:text-red-400 underline" aria-label="お気に入りをクリア">クリア</button>
+      </h2>
+      <ul id="favoritesList" class="space-y-2 text-sm max-h-56 overflow-y-auto"></ul>
+      <p id="favoritesEmpty" class="text-gray-400 text-xs italic">まだお気に入りがありません</p>
+    </section>
+  </div>
+
+  <script>
+    const QUESTIONS = {
+      仕事: [
+        "最近チームで取り組んでいる課題は？",
+        "仕事でやりがいを感じる瞬間は？",
+        "今の仕事を選んだきっかけを教えてください",
+        "職場で尊敬している人はどんな人ですか？",
+        "仕事で一番大切にしていることは何ですか？",
+        "新しいプロジェクトで最初にやることは？",
+        "チームワークで大切だと思うことは？",
+        "失敗から学んだ一番の教訓は何ですか？",
+        "理想の働き方はどんなスタイルですか？",
+        "仕事の中で一番好きな作業は何ですか？",
+        "会議を効果的にするために工夫していることは？",
+        "キャリアの転換点になった経験を教えてください",
+        "新入社員にアドバイスするとしたら何を言いますか？",
+        "今後習得したいスキルや知識は？",
+        "リモートワークで気をつけていることは？",
+        "仕事の効率を上げるために使っているツールやコツは？",
+        "上司や先輩に言われて印象に残っている言葉は？",
+        "今の職場のいいところを一つ挙げるとしたら？",
+        "仕事とプライベートのバランスをどう保っていますか？",
+        "もし一日だけ別の役職になれるとしたら何がいいですか？"
+      ],
+      趣味: [
+        "最近ハマっていることは？",
+        "週末に何をするのが好きですか？",
+        "子供の頃から続けている趣味はありますか？",
+        "最近始めた新しい趣味を教えてください",
+        "趣味を通じて出会った人はいますか？",
+        "好きな映画やドラマのジャンルは何ですか？",
+        "料理は得意ですか？得意な料理は？",
+        "音楽を聴くのと演奏するのどちらが好きですか？",
+        "最近読んで良かった本は何ですか？",
+        "スポーツは観る派？する派？",
+        "一人でする趣味と複数人でする趣味どちらが多いですか？",
+        "趣味にかけている時間や費用は？",
+        "コレクションしているものはありますか？",
+        "アウトドアとインドア、どちらが好きですか？",
+        "最近行ったイベントや体験を教えてください",
+        "趣味が仕事に活きたことはありますか？",
+        "子供の頃に好きだった遊びは何ですか？",
+        "もし新しい楽器を習うとしたら何にしますか？",
+        "好きなゲームや遊びのジャンルは？",
+        "趣味を人に教えたり一緒にやったことはありますか？"
+      ],
+      旅行: [
+        "もう一度行きたい場所は？",
+        "意外な旅行先のおすすめを教えてください",
+        "旅行で一番印象に残っている体験は？",
+        "海外旅行と国内旅行どちらが好きですか？",
+        "旅行で食べた一番おいしいものは何ですか？",
+        "旅行スタイルはのんびり派？アクティブ派？",
+        "旅行でハプニングに遭ったことはありますか？",
+        "次に行きたい場所はどこですか？",
+        "旅行のお土産で一番喜ばれたものは？",
+        "一人旅と複数人旅行、どちらが好きですか？",
+        "旅行先で地元の人と交流したことはありますか？",
+        "旅行で一番大切にしていることは何ですか？",
+        "長期旅行と短期旅行どちらが好きですか？",
+        "旅行でリフレッシュできる瞬間はいつですか？",
+        "旅行先で試した珍しい食べ物は？",
+        "旅行の計画を立てるのは得意ですか？",
+        "旅行で持っていくと便利なアイテムは？",
+        "旅行先で迷子になったことはありますか？",
+        "旅行で見た中で一番美しい景色は？",
+        "もし世界一周できるとしたら、まずどこに行きますか？"
+      ],
+      夢: [
+        "5年後にどうなっていたいですか？",
+        "もし今日から全く違う仕事をするなら？",
+        "子供の頃の夢は何でしたか？",
+        "いつか挑戦してみたいことは何ですか？",
+        "もし時間とお金が無限にあったら何をしますか？",
+        "10年後の自分に手紙を書くとしたら何を伝えますか？",
+        "あなたにとって理想の一日はどんな日ですか？",
+        "世界を変えられるとしたら何を変えますか？",
+        "もし第二の人生を生きるとしたらどんな人になりたいですか？",
+        "あなたの人生のモットーや座右の銘は？",
+        "いつかやってみたいボランティアや社会貢献は？",
+        "引退後にやってみたいことは何ですか？",
+        "自分の子供や後輩に伝えたい一番大切なことは？",
+        "新しいスキルを身につけるとしたら何がいいですか？",
+        "もし本を出版するとしたらどんな本を書きますか？",
+        "あなたが誇りに思う自分の一面は何ですか？",
+        "今からでも遅くないと思っていることは何ですか？",
+        "夢を叶えるために今やっていることは？",
+        "あなたにとって「成功」とはどういう意味ですか？",
+        "10年前の自分にアドバイスするとしたら何を言いますか？"
+      ]
+    };
+
+    const CAT_COLORS = {
+      仕事: { badge: 'bg-indigo-100 text-indigo-600', border: 'border-l-indigo-400' },
+      趣味: { badge: 'bg-green-100 text-green-600', border: 'border-l-green-400' },
+      旅行: { badge: 'bg-orange-100 text-orange-600', border: 'border-l-orange-400' },
+      夢: { badge: 'bg-pink-100 text-pink-600', border: 'border-l-pink-400' }
+    };
+
+    let activeCategories = new Set(['仕事', '趣味', '旅行', '夢']);
+    let currentQuestion = null;
+    let currentCategory = null;
+    let spinInterval = null;
+
+    function getState() {
+      return {
+        favorites: JSON.parse(localStorage.getItem('ib_favorites') || '[]'),
+        history: JSON.parse(localStorage.getItem('ib_history') || '[]')
+      };
+    }
+
+    function saveState(key, val) {
+      localStorage.setItem(key, JSON.stringify(val));
+    }
+
+    function toggleCategory(btn) {
+      const cat = btn.dataset.cat;
+      if (activeCategories.has(cat)) {
+        if (activeCategories.size === 1) return;
+        activeCategories.delete(cat);
+        btn.setAttribute('aria-checked', 'false');
+        btn.classList.remove('active');
+        btn.classList.replace('border-opacity-100', 'border-opacity-30');
+        btn.style.opacity = '0.5';
+      } else {
+        activeCategories.add(cat);
+        btn.setAttribute('aria-checked', 'true');
+        btn.classList.add('active');
+        btn.style.opacity = '1';
+      }
+    }
+
+    function getAllQuestions() {
+      const all = [];
+      activeCategories.forEach(cat => {
+        QUESTIONS[cat].forEach(q => all.push({ question: q, category: cat }));
+      });
+      return all;
+    }
+
+    function spinQuestion() {
+      if (spinInterval) return;
+      const btn = document.getElementById('spinBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ スピン中...';
+
+      const display = document.getElementById('questionDisplay');
+      display.classList.add('spinning');
+      document.getElementById('favoriteBtn').style.display = 'none';
+      document.getElementById('categoryBadge').textContent = '';
+
+      const { history } = getState();
+      const recentSet = new Set(history.slice(-10).map(h => h.question));
+      const all = getAllQuestions();
+      const pool = all.filter(q => !recentSet.has(q.question));
+      const source = pool.length > 0 ? pool : all;
+
+      let count = 0;
+      const totalFrames = 25 + Math.floor(Math.random() * 15);
+
+      spinInterval = setInterval(() => {
+        const idx = Math.floor(Math.random() * all.length);
+        display.textContent = all[idx].question;
+        count++;
+
+        if (count >= totalFrames) {
+          clearInterval(spinInterval);
+          spinInterval = null;
+
+          const finalIdx = Math.floor(Math.random() * source.length);
+          const chosen = source[finalIdx];
+          currentQuestion = chosen.question;
+          currentCategory = chosen.category;
+
+          display.classList.remove('spinning');
+          display.classList.add('landing');
+          display.textContent = currentQuestion;
+
+          const badge = document.getElementById('categoryBadge');
+          const colors = CAT_COLORS[currentCategory];
+          badge.className = `absolute top-4 right-4 text-xs px-3 py-1 rounded-full font-medium ${colors.badge}`;
+          badge.textContent = currentCategory;
+
+          const favBtn = document.getElementById('favoriteBtn');
+          favBtn.style.display = 'inline';
+          updateFavBtn();
+
+          // Save to history
+          const { history: h, favorites: f } = getState();
+          h.push({ question: currentQuestion, category: currentCategory });
+          if (h.length > 50) h.shift();
+          saveState('ib_history', h);
+          renderHistory();
+
+          setTimeout(() => display.classList.remove('landing'), 300);
+          btn.disabled = false;
+          btn.textContent = '🎲 スピン！';
+        }
+      }, 80);
+    }
+
+    function updateFavBtn() {
+      const { favorites } = getState();
+      const isFav = favorites.some(f => f.question === currentQuestion);
+      const btn = document.getElementById('favoriteBtn');
+      btn.textContent = isFav ? '❤️' : '🤍';
+      btn.setAttribute('aria-label', isFav ? 'お気に入りから削除' : 'お気に入りに追加');
+    }
+
+    function toggleFavorite() {
+      if (!currentQuestion) return;
+      let { favorites } = getState();
+      const idx = favorites.findIndex(f => f.question === currentQuestion);
+      if (idx >= 0) {
+        favorites.splice(idx, 1);
+      } else {
+        if (favorites.length >= 30) {
+          alert('お気に入りは最大30件です。古いものを削除してください。');
+          return;
+        }
+        favorites.push({ question: currentQuestion, category: currentCategory });
+      }
+      saveState('ib_favorites', favorites);
+      updateFavBtn();
+      renderFavorites();
+    }
+
+    function renderHistory() {
+      const { history } = getState();
+      const list = document.getElementById('historyList');
+      list.innerHTML = '';
+      const recent = history.slice(-10).reverse();
+      recent.forEach(item => {
+        const li = document.createElement('li');
+        const colors = CAT_COLORS[item.category];
+        li.className = `flex items-start gap-2 border-l-2 pl-2 ${colors.border}`;
+        li.innerHTML = `<span class="text-xs px-2 py-0.5 rounded-full ${colors.badge /* xss-ok: ハードコードCAT_COLORSマップのbadge値 */} shrink-0">${item.category /* xss-ok: ハードコードQUESTIONSのcategory */}</span><span>${item.question /* xss-ok: ハードコードQUESTIONSのquestion */}</span>`;
+        list.appendChild(li);
+      });
+    }
+
+    function renderFavorites() {
+      const { favorites } = getState();
+      const list = document.getElementById('favoritesList');
+      const empty = document.getElementById('favoritesEmpty');
+      list.innerHTML = '';
+      if (favorites.length === 0) {
+        empty.style.display = '';
+        return;
+      }
+      empty.style.display = 'none';
+      favorites.forEach((item, idx) => {
+        const li = document.createElement('li');
+        const colors = CAT_COLORS[item.category];
+        li.className = `flex items-start gap-2 bg-white rounded-lg p-2 shadow-sm border border-gray-100`;
+        li.innerHTML = `
+          <span class="text-xs px-2 py-0.5 rounded-full ${colors.badge /* xss-ok: ハードコードCAT_COLORSマップのbadge値 */} shrink-0 mt-0.5">${item.category /* xss-ok: ハードコードQUESTIONSのcategory */}</span>
+          <span class="flex-1 text-gray-700">${item.question /* xss-ok: ハードコードQUESTIONSのquestion */}</span>
+          <button onclick="removeFavorite(${idx /* xss-ok: 整数ループカウンタ */})" aria-label="お気に入りから削除" class="text-gray-300 hover:text-red-400 shrink-0 text-lg leading-none">×</button>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function removeFavorite(idx) {
+      let { favorites } = getState();
+      favorites.splice(idx, 1);
+      saveState('ib_favorites', favorites);
+      renderFavorites();
+      if (currentQuestion) updateFavBtn();
+    }
+
+    function clearHistory() {
+      saveState('ib_history', []);
+      renderHistory();
+    }
+
+    function clearFavorites() {
+      if (!confirm('お気に入りをすべて削除しますか？')) return;
+      saveState('ib_favorites', []);
+      renderFavorites();
+      if (currentQuestion) updateFavBtn();
+    }
+
+    // Init
+    renderHistory();
+    renderFavorites();
+  </script>
+</body>
+</html>
